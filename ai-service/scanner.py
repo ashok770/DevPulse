@@ -39,19 +39,33 @@ def scan_project(project_path):
                     imports = re.findall(import_pattern, content)
                     requires = re.findall(require_pattern, content)
 
+                    print(f"Found imports in {file}:", imports)
+                    print(f"Found requires in {file}:", requires)
+
                     for imp in imports:
+                        target_file = os.path.basename(imp) + ".js"
                         dependencies.append({
                             "source": file,
-                            "target": imp
+                            "target": target_file
                         })
 
                     for req in requires:
+                        target_file = os.path.basename(req) + ".js"
                         dependencies.append({
                             "source": file,
-                            "target": req
+                            "target": target_file
                         })
 
+    graph = {file: [] for file in files}
+    
+    for dep in dependencies:
+        source = dep["source"]
+        target = dep["target"]
+        if source in graph:
+            graph[source].append(target)
+    
     return {
         "files": files,
-        "dependencies": dependencies
+        "dependencies": dependencies,
+        "graph": graph
     }
