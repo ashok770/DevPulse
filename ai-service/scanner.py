@@ -8,12 +8,20 @@ require_pattern = r'require\([\'"](.*)[\'"]\)'
 
 
 def scan_project(project_path):
+
+    project_path = os.path.abspath(project_path)
+    print("Scanning project path:", project_path)
+    print("Directory exists:", os.path.exists(project_path))
+    print("Directory contents:", os.listdir(project_path))
+
     files = []
     dependencies = []
 
     for root, dirs, filenames in os.walk(project_path):
 
-        # Remove ignored directories
+        print("Current folder:", root)
+        print("Files here:", filenames)
+
         dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
 
         for file in filenames:
@@ -21,7 +29,9 @@ def scan_project(project_path):
             if file.endswith(".js") or file.endswith(".ts"):
 
                 file_path = os.path.join(root, file)
-                files.append(file_path)
+                print("JS file detected:", file_path)
+
+                files.append(file)
 
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
