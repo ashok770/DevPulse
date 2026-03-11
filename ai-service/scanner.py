@@ -73,9 +73,15 @@ def scan_project(project_path):
 def impact_analysis(graph, changed_file):
 
     affected = []
+    queue = [changed_file]
 
-    for source, targets in graph.items():
-        if changed_file in targets:
-            affected.append(source)
+    while queue:
+        current = queue.pop(0)
 
-    return affected    
+        for source, targets in graph.items():
+
+            if current in targets and source not in affected:
+                affected.append(source)
+                queue.append(source)
+
+    return affected
