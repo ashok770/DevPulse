@@ -7,6 +7,7 @@ import ReactFlow, {
   useEdgesState,
   addEdge
 } from "reactflow";
+import dagre from "dagre";
 import "reactflow/dist/style.css";
 
 function App() {
@@ -36,6 +37,35 @@ function App() {
     }
   }, []);
 
+  const getLayoutedElements = (nodes, edges) => {
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+    dagreGraph.setGraph({ rankdir: "TB" }); // TB = Top to Bottom
+
+    nodes.forEach((node) => {
+      dagreGraph.setNode(node.id, { width: 150, height: 50 });
+    });
+
+    edges.forEach((edge) => {
+      dagreGraph.setEdge(edge.source, edge.target);
+    });
+
+    dagre.layout(dagreGraph);
+
+    const layoutedNodes = nodes.map((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id);
+      return {
+        ...node,
+        position: {
+          x: nodeWithPosition.x - 75,
+          y: nodeWithPosition.y - 25,
+        },
+      };
+    });
+
+    return { nodes: layoutedNodes, edges };
+  };
+
   const scanProject = async () => {
     try {
       const res = await axios.post("http://127.0.0.1:8000/scan", {
@@ -47,11 +77,11 @@ function App() {
       const newNodes = [];
       const newEdges = [];
 
-      Object.keys(graph).forEach((file, index) => {
+      Object.keys(graph).forEach((file) => {
         newNodes.push({
           id: file,
           data: { label: file },
-          position: { x: index * 250, y: 150 },
+          position: { x: 0, y: 0 },
         });
 
         graph[file].forEach((target) => {
@@ -64,8 +94,13 @@ function App() {
         });
       });
 
-      setNodes(newNodes);
-      setEdges(newEdges);
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+        newNodes,
+        newEdges
+      );
+
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
     } catch (err) {
       console.error(err);
     }
