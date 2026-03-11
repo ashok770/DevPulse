@@ -69,3 +69,13 @@ def scan_project(project_path):
         "dependencies": dependencies,
         "graph": graph
     }
+
+def impact_analysis(graph, changed_file):
+
+    affected = []
+
+    for source, targets in graph.items():
+        if changed_file in targets:
+            affected.append(source)
+
+    return affected    
