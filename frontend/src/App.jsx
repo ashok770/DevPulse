@@ -1,14 +1,22 @@
-import { useState, useMemo } from "react";
+import { useState, useCallback } from "react";
 import axios from "axios";
-import ReactFlow from "reactflow";
+import ReactFlow, { 
+  Controls, 
+  Background,
+  useNodesState,
+  useEdgesState,
+  addEdge
+} from "reactflow";
 import "reactflow/dist/style.css";
 
 function App() {
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  const nodeTypes = useMemo(() => ({}), []);
-  const edgeTypes = useMemo(() => ({}), []);
+  const onConnect = useCallback(
+    (params) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
 
   const scanProject = async () => {
     try {
@@ -21,13 +29,11 @@ function App() {
       const newNodes = [];
       const newEdges = [];
 
-      let y = 0;
-
       Object.keys(graph).forEach((file, index) => {
         newNodes.push({
           id: file,
           data: { label: file },
-          position: { x: index * 200, y },
+          position: { x: index * 250, y: 150 },
         });
 
         graph[file].forEach((target) => {
@@ -35,6 +41,7 @@ function App() {
             id: file + "-" + target,
             source: file,
             target: target,
+            animated: true,
           });
         });
       });
@@ -56,18 +63,29 @@ function App() {
           top: 20,
           left: 20,
           padding: "10px 20px",
+          background: "#2563eb",
+          color: "white",
+          border: "none",
+          borderRadius: "6px",
+          cursor: "pointer",
         }}
       >
         Scan Codebase
       </button>
 
-      <ReactFlow 
-        nodes={nodes} 
-        edges={edges} 
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        fitView 
-      />
+      <div style={{ height: "100%", width: "100%" }}>
+        <ReactFlow 
+          nodes={nodes} 
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          fitView
+        >
+          <Controls />
+          <Background />
+        </ReactFlow>
+      </div>
     </div>
   );
 }
