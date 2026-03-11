@@ -1,7 +1,7 @@
 import { useDropzone } from "react-dropzone";
 import axios from "axios";
 
-function UploadZone({ setNodes, setEdges, getLayoutedElements }) {
+function UploadZone({ setNodes, setEdges, getLayoutedElements, setProjectId }) {
   const onDrop = async (acceptedFiles) => {
     const file = acceptedFiles[0];
 
@@ -14,6 +14,10 @@ function UploadZone({ setNodes, setEdges, getLayoutedElements }) {
       });
 
       const graph = res.data.graph;
+      const projectId = res.data.project_id;
+
+      // Set the project ID for impact analysis
+      setProjectId(projectId);
 
       const nodes = [];
       const edges = [];

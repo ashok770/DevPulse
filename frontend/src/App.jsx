@@ -16,6 +16,8 @@ function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [affectedFiles, setAffectedFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState("");
+  const [currentProjectPath, setCurrentProjectPath] = useState("../test_project");
+  const [projectId, setProjectId] = useState(null);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -27,16 +29,17 @@ function App() {
     setSelectedFile(node.id);
 
     try {
+      const impactPath = projectId ? `uploads/${projectId}` : currentProjectPath;
       const res = await axios.post("http://127.0.0.1:8000/impact", {
         file: node.id,
-        project_path: "../test_project",
+        project_path: impactPath,
       });
 
       setAffectedFiles(res.data.affected_files);
     } catch (err) {
       console.error(err);
     }
-  }, []);
+  }, [currentProjectPath, projectId]);
 
   const getLayoutedElements = (nodes, edges) => {
     const dagreGraph = new dagre.graphlib.Graph();
@@ -70,7 +73,7 @@ function App() {
   const scanProject = async () => {
     try {
       const res = await axios.post("http://127.0.0.1:8000/scan", {
-        project_path: "../test_project",
+        project_path: currentProjectPath,
       });
 
       const graph = res.data.graph;
@@ -100,6 +103,7 @@ function App() {
 
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
+      setProjectId(null); // Reset for local scan
     } catch (err) {
       console.error(err);
     }
@@ -195,6 +199,7 @@ function App() {
         setNodes={setNodes}
         setEdges={setEdges}
         getLayoutedElements={getLayoutedElements}
+        setProjectId={setProjectId}
       />
     </div>
   );
