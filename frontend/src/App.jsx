@@ -21,6 +21,7 @@ function App() {
   const [search, setSearch] = useState("");
   const [originalNodes, setOriginalNodes] = useState([]);
   const [originalEdges, setOriginalEdges] = useState([]);
+  const [highlighted, setHighlighted] = useState([]);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -43,6 +44,36 @@ function App() {
       console.error(err);
     }
   }, [currentProjectPath, projectId]);
+
+  const highlightDependencies = (file) => {
+    const related = new Set();
+    related.add(file);
+
+    originalEdges.forEach(edge => {
+      if (edge.source === file || edge.target === file) {
+        related.add(edge.source);
+        related.add(edge.target);
+      }
+    });
+
+    const newNodes = originalNodes.map(node => ({
+      ...node,
+      style: {
+        opacity: related.has(node.id) ? 1 : 0.2
+      }
+    }));
+
+    const newEdges = originalEdges.map(edge => ({
+      ...edge,
+      animated: related.has(edge.source) && related.has(edge.target),
+      style: {
+        opacity: related.has(edge.source) && related.has(edge.target) ? 1 : 0.1
+      }
+    }));
+
+    setNodes(newNodes);
+    setEdges(newEdges);
+  };
 
   const filterGraph = (query) => {
     if (!query) {
@@ -246,7 +277,10 @@ function App() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
-          onNodeClick={handleNodeClick}
+          onNodeClick={(event, node) => {
+            handleNodeClick(event, node);
+            highlightDependencies(node.id);
+          }}
           fitView
         >
           <Controls />
