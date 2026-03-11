@@ -1,4 +1,7 @@
-from fastapi import FastAPI
+import zipfile
+import os
+import uuid
+from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
 from scanner import scan_project, impact_analysis 
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,3 +40,26 @@ def impact(req: ImpactRequest):
         "changed_file": req.file,
         "affected_files": affected
     }
+@app.post("/upload")
+async def upload_zip(file: UploadFile = File(...)):
+
+    upload_id = str(uuid.uuid4())
+    extract_path = f"uploads/{upload_id}"
+
+    os.makedirs(extract_path, exist_ok=True)
+
+    zip_path = f"{extract_path}/project.zip"
+
+    with open(zip_path, "wb") as buffer:
+        buffer.write(await file.read())
+
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_path)
+
+    result = scan_project(extract_path)
+
+    return {
+        "project_id": upload_id,
+        "graph": result["graph"],
+        "files": result["files"]
+    }    
