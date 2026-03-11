@@ -130,8 +130,8 @@ function App() {
           style={{
             position: "absolute",
             zIndex: 10,
-            top: 80,
-            left: 20,
+            top: 20,
+            right: 20,
             padding: "15px",
             background: "white",
             border: "1px solid #ccc",
@@ -160,6 +160,20 @@ function App() {
           ) : (
             <p style={{ fontSize: "13px", color: "#666" }}>No files affected</p>
           )}
+          <button
+            onClick={() => setSelectedFile("")}
+            style={{
+              marginTop: "10px",
+              padding: "5px 10px",
+              background: "#f0f0f0",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "12px",
+            }}
+          >
+            Close
+          </button>
         </div>
       )}
 
