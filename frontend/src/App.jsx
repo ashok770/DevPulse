@@ -12,11 +12,29 @@ import "reactflow/dist/style.css";
 function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [affectedFiles, setAffectedFiles] = useState([]);
+  const [selectedFile, setSelectedFile] = useState("");
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
+
+  const handleNodeClick = useCallback(async (event, node) => {
+    console.log("Node clicked:", node);
+    setSelectedFile(node.id);
+    
+    try {
+      const res = await axios.post("http://127.0.0.1:8000/impact", {
+        file: node.id,
+        project_path: "../test_project",
+      });
+      
+      setAffectedFiles(res.data.affected_files);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
 
   const scanProject = async () => {
     try {
@@ -73,6 +91,42 @@ function App() {
         Scan Codebase
       </button>
 
+      {selectedFile && (
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 10,
+            top: 80,
+            left: 20,
+            padding: "15px",
+            background: "white",
+            border: "1px solid #ccc",
+            borderRadius: "8px",
+            maxWidth: "300px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          }}
+        >
+          <h3 style={{ margin: "0 0 10px 0", fontSize: "16px" }}>
+            Impact Analysis
+          </h3>
+          <p style={{ margin: "0 0 10px 0", fontSize: "14px" }}>
+            <strong>Changed File:</strong> {selectedFile}
+          </p>
+          <p style={{ margin: "0 0 5px 0", fontSize: "14px" }}>
+            <strong>Affected Files:</strong>
+          </p>
+          {affectedFiles.length > 0 ? (
+            <ul style={{ margin: 0, paddingLeft: "20px" }}>
+              {affectedFiles.map((file, index) => (
+                <li key={index} style={{ fontSize: "13px" }}>{file}</li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ fontSize: "13px", color: "#666" }}>No files affected</p>
+          )}
+        </div>
+      )}
+
       <div style={{ height: "100%", width: "100%" }}>
         <ReactFlow 
           nodes={nodes} 
@@ -80,6 +134,7 @@ function App() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeClick={handleNodeClick}
           fitView
         >
           <Controls />
