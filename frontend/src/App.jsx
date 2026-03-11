@@ -1,11 +1,12 @@
 import { useState, useCallback } from "react";
+import UploadZone from "./UploadZone";
 import axios from "axios";
-import ReactFlow, { 
-  Controls, 
+import ReactFlow, {
+  Controls,
   Background,
   useNodesState,
   useEdgesState,
-  addEdge
+  addEdge,
 } from "reactflow";
 import dagre from "dagre";
 import "reactflow/dist/style.css";
@@ -18,19 +19,19 @@ function App() {
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
+    [setEdges],
   );
 
   const handleNodeClick = useCallback(async (event, node) => {
     console.log("Node clicked:", node);
     setSelectedFile(node.id);
-    
+
     try {
       const res = await axios.post("http://127.0.0.1:8000/impact", {
         file: node.id,
         project_path: "../test_project",
       });
-      
+
       setAffectedFiles(res.data.affected_files);
     } catch (err) {
       console.error(err);
@@ -94,10 +95,8 @@ function App() {
         });
       });
 
-      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-        newNodes,
-        newEdges
-      );
+      const { nodes: layoutedNodes, edges: layoutedEdges } =
+        getLayoutedElements(newNodes, newEdges);
 
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
@@ -153,7 +152,9 @@ function App() {
           {affectedFiles.length > 0 ? (
             <ul style={{ margin: 0, paddingLeft: "20px" }}>
               {affectedFiles.map((file, index) => (
-                <li key={index} style={{ fontSize: "13px" }}>{file}</li>
+                <li key={index} style={{ fontSize: "13px" }}>
+                  {file}
+                </li>
               ))}
             </ul>
           ) : (
@@ -163,8 +164,8 @@ function App() {
       )}
 
       <div style={{ height: "100%", width: "100%" }}>
-        <ReactFlow 
-          nodes={nodes} 
+        <ReactFlow
+          nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
@@ -176,6 +177,11 @@ function App() {
           <Background />
         </ReactFlow>
       </div>
+      <UploadZone
+        setNodes={setNodes}
+        setEdges={setEdges}
+        getLayoutedElements={getLayoutedElements}
+      />
     </div>
   );
 }
