@@ -18,6 +18,9 @@ function App() {
   const [selectedFile, setSelectedFile] = useState("");
   const [currentProjectPath, setCurrentProjectPath] = useState("../test_project");
   const [projectId, setProjectId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [originalNodes, setOriginalNodes] = useState([]);
+  const [originalEdges, setOriginalEdges] = useState([]);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -40,6 +43,38 @@ function App() {
       console.error(err);
     }
   }, [currentProjectPath, projectId]);
+
+  const filterGraph = (query) => {
+    if (!query) {
+      setNodes(originalNodes);
+      setEdges(originalEdges);
+      return;
+    }
+
+    const lower = query.toLowerCase();
+
+    const matchedNodes = originalNodes.filter(node =>
+      node.id.toLowerCase().includes(lower)
+    );
+
+    const matchedIds = new Set(matchedNodes.map(n => n.id));
+
+    const connectedEdges = originalEdges.filter(edge =>
+      matchedIds.has(edge.source) || matchedIds.has(edge.target)
+    );
+
+    connectedEdges.forEach(edge => {
+      matchedIds.add(edge.source);
+      matchedIds.add(edge.target);
+    });
+
+    const filteredNodes = originalNodes.filter(node =>
+      matchedIds.has(node.id)
+    );
+
+    setNodes(filteredNodes);
+    setEdges(connectedEdges);
+  };
 
   const getLayoutedElements = (nodes, edges) => {
     const dagreGraph = new dagre.graphlib.Graph();
@@ -101,6 +136,9 @@ function App() {
       const { nodes: layoutedNodes, edges: layoutedEdges } =
         getLayoutedElements(newNodes, newEdges);
 
+      setOriginalNodes(layoutedNodes);
+      setOriginalEdges(layoutedEdges);
+      
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
       setProjectId(null); // Reset for local scan
@@ -128,6 +166,26 @@ function App() {
       >
         Scan Codebase
       </button>
+
+      <input
+        type="text"
+        placeholder="Search file..."
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          filterGraph(e.target.value);
+        }}
+        style={{
+          position: "absolute",
+          top: 20,
+          left: 200,
+          zIndex: 10,
+          padding: "8px",
+          width: "200px",
+          borderRadius: "6px",
+          border: "1px solid #ccc"
+        }}
+      />
 
       {selectedFile && (
         <div
@@ -200,6 +258,8 @@ function App() {
         setEdges={setEdges}
         getLayoutedElements={getLayoutedElements}
         setProjectId={setProjectId}
+        setOriginalNodes={setOriginalNodes}
+        setOriginalEdges={setOriginalEdges}
       />
     </div>
   );

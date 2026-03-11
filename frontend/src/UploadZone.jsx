@@ -1,7 +1,7 @@
 import { useDropzone } from "react-dropzone";
 import axios from "axios";
 
-function UploadZone({ setNodes, setEdges, getLayoutedElements, setProjectId }) {
+function UploadZone({ setNodes, setEdges, getLayoutedElements, setProjectId, setOriginalNodes, setOriginalEdges }) {
   const onDrop = async (acceptedFiles) => {
     const file = acceptedFiles[0];
 
@@ -41,6 +41,9 @@ function UploadZone({ setNodes, setEdges, getLayoutedElements, setProjectId }) {
 
       const layouted = getLayoutedElements(nodes, edges);
 
+      setOriginalNodes(layouted.nodes);
+      setOriginalEdges(layouted.edges);
+      
       setNodes(layouted.nodes);
       setEdges(layouted.edges);
     } catch (err) {
