@@ -1,8 +1,17 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from scanner import scan_project, impact_analysis
+from scanner import scan_project, impact_analysis 
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ScanRequest(BaseModel):
     project_path: str

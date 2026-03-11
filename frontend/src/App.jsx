@@ -1,35 +1,75 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState, useMemo } from "react";
+import axios from "axios";
+import ReactFlow from "reactflow";
+import "reactflow/dist/style.css";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+
+  const nodeTypes = useMemo(() => ({}), []);
+  const edgeTypes = useMemo(() => ({}), []);
+
+  const scanProject = async () => {
+    try {
+      const res = await axios.post("http://127.0.0.1:8000/scan", {
+        project_path: "../test_project",
+      });
+
+      const graph = res.data.graph;
+
+      const newNodes = [];
+      const newEdges = [];
+
+      let y = 0;
+
+      Object.keys(graph).forEach((file, index) => {
+        newNodes.push({
+          id: file,
+          data: { label: file },
+          position: { x: index * 200, y },
+        });
+
+        graph[file].forEach((target) => {
+          newEdges.push({
+            id: file + "-" + target,
+            source: file,
+            target: target,
+          });
+        });
+      });
+
+      setNodes(newNodes);
+      setEdges(newEdges);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div style={{ height: "100vh", width: "100vw" }}>
+      <button
+        onClick={scanProject}
+        style={{
+          position: "absolute",
+          zIndex: 10,
+          top: 20,
+          left: 20,
+          padding: "10px 20px",
+        }}
+      >
+        Scan Codebase
+      </button>
+
+      <ReactFlow 
+        nodes={nodes} 
+        edges={edges} 
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        fitView 
+      />
+    </div>
+  );
 }
 
-export default App
+export default App;
