@@ -6,7 +6,8 @@ import time
 import threading
 import subprocess
 import tempfile
-from fastapi import FastAPI, UploadFile, File
+import asyncio
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 from pydantic import BaseModel
 from scanner import scan_project, impact_analysis 
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,6 +43,9 @@ def cleanup_old_uploads():
                 except Exception as e:
                     print(f"Error cleaning up {folder_name}: {e}")
 
+# Store for async GitHub analysis results
+github_results = {}
+
 def schedule_cleanup(upload_path):
     """Schedule cleanup of upload folder after 1 hour"""
     def delayed_cleanup():
@@ -66,6 +70,9 @@ class ImpactRequest(BaseModel):
 
 class GitHubRequest(BaseModel):
     repo_url: str
+
+class GitHubStatusRequest(BaseModel):
+    job_id: str
 
 @app.post("/scan")
 def scan(req: ScanRequest):
@@ -114,49 +121,74 @@ async def upload_zip(file: UploadFile = File(...)):
     }
 
 @app.post("/github")
-def analyze_github(req: GitHubRequest):
+def analyze_github(req: GitHubRequest, background_tasks: BackgroundTasks):
+    job_id = str(uuid.uuid4())
+    github_results[job_id] = {"status": "processing", "progress": "Starting analysis..."}
+    
+    # Start background processing
+    background_tasks.add_task(process_github_repo, req.repo_url, job_id)
+    
+    return {
+        "job_id": job_id,
+        "status": "processing",
+        "message": "Analysis started. Use /github/status to check progress."
+    }
+
+@app.post("/github/status")
+def get_github_status(req: GitHubStatusRequest):
+    if req.job_id not in github_results:
+        return {"error": "Job ID not found"}
+    
+    return github_results[req.job_id]
+
+def process_github_repo(repo_url: str, job_id: str):
     temp_dir = None
     try:
-        print(f"Starting GitHub analysis for: {req.repo_url}")
-        
-        # Create temporary directory
+        github_results[job_id]["progress"] = "Creating temporary directory..."
         temp_dir = tempfile.mkdtemp()
-        print(f"Created temp directory: {temp_dir}")
         
-        # Clone the repository with increased timeout
-        print("Starting git clone...")
+        github_results[job_id]["progress"] = "Cloning repository (this may take a while for large repos)..."
+        
+        # Use shallow clone with limited options for faster cloning
         result = subprocess.run(
-            ["git", "clone", "--depth", "1", req.repo_url, temp_dir],
+            ["git", "clone", "--depth", "1", "--single-branch", repo_url, temp_dir],
             capture_output=True,
             text=True,
-            timeout=300  # Increased to 5 minutes
+            timeout=600  # 10 minutes for large repos
         )
         
         if result.returncode != 0:
-            print(f"Git clone failed: {result.stderr}")
-            return {"error": f"Failed to clone repository: {result.stderr}"}
+            github_results[job_id] = {
+                "status": "error",
+                "error": f"Failed to clone repository: {result.stderr}"
+            }
+            return
         
-        print("Git clone successful, starting scan...")
+        github_results[job_id]["progress"] = "Repository cloned successfully. Scanning files..."
+        
         # Scan the cloned repository
         scan_result = scan_project(temp_dir)
-        print(f"Scan completed. Found {len(scan_result['files'])} files")
         
-        return {
+        github_results[job_id] = {
+            "status": "completed",
             "graph": scan_result["graph"],
             "files": scan_result["files"],
             "dependencies": scan_result["dependencies"]
         }
         
     except subprocess.TimeoutExpired:
-        print("Repository cloning timed out after 5 minutes")
-        return {"error": "Repository cloning timed out (5 minutes limit)"}
+        github_results[job_id] = {
+            "status": "error",
+            "error": "Repository cloning timed out (10 minutes limit). Repository may be too large."
+        }
     except Exception as e:
-        print(f"Error during GitHub analysis: {str(e)}")
-        return {"error": f"Error analyzing repository: {str(e)}"}
+        github_results[job_id] = {
+            "status": "error",
+            "error": f"Error analyzing repository: {str(e)}"
+        }
     finally:
         # Clean up temporary directory
         if temp_dir and os.path.exists(temp_dir):
-            print(f"Cleaning up temp directory: {temp_dir}")
             shutil.rmtree(temp_dir)
 
 

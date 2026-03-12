@@ -23,6 +23,8 @@ function App() {
   const [originalEdges, setOriginalEdges] = useState([]);
   const [highlighted, setHighlighted] = useState([]);
   const [repoUrl, setRepoUrl] = useState("");
+  const [githubStatus, setGithubStatus] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -52,48 +54,91 @@ function App() {
       return;
     }
 
+    setIsAnalyzing(true);
+    setGithubStatus("Starting analysis...");
+
     try {
+      // Start the analysis
       const res = await axios.post("http://127.0.0.1:8000/github", {
         repo_url: repoUrl
       });
 
       if (res.data.error) {
         alert(`Error: ${res.data.error}`);
+        setIsAnalyzing(false);
+        setGithubStatus("");
         return;
       }
 
-      const graph = res.data.graph;
+      const jobId = res.data.job_id;
+      setGithubStatus("Analysis in progress...");
 
-      const nodes = [];
-      const edges = [];
-
-      Object.keys(graph).forEach((file, index) => {
-        nodes.push({
-          id: file,
-          data: { label: file },
-          position: { x: index * 200, y: 100 }
-        });
-
-        graph[file].forEach(target => {
-          edges.push({
-            id: file + "-" + target,
-            source: file,
-            target: target
+      // Poll for status updates
+      const pollStatus = async () => {
+        try {
+          const statusRes = await axios.post("http://127.0.0.1:8000/github/status", {
+            job_id: jobId
           });
-        });
-      });
 
-      const layouted = getLayoutedElements(nodes, edges);
+          const status = statusRes.data;
 
-      setOriginalNodes(layouted.nodes);
-      setOriginalEdges(layouted.edges);
-      
-      setNodes(layouted.nodes);
-      setEdges(layouted.edges);
-      setProjectId(null); // Reset for GitHub scan
+          if (status.status === "processing") {
+            setGithubStatus(status.progress || "Processing...");
+            setTimeout(pollStatus, 2000); // Poll every 2 seconds
+          } else if (status.status === "completed") {
+            setGithubStatus("Analysis completed!");
+            
+            // Process the results
+            const graph = status.graph;
+            const nodes = [];
+            const edges = [];
+
+            Object.keys(graph).forEach((file, index) => {
+              nodes.push({
+                id: file,
+                data: { label: file },
+                position: { x: index * 200, y: 100 }
+              });
+
+              graph[file].forEach(target => {
+                edges.push({
+                  id: file + "-" + target,
+                  source: file,
+                  target: target
+                });
+              });
+            });
+
+            const layouted = getLayoutedElements(nodes, edges);
+
+            setOriginalNodes(layouted.nodes);
+            setOriginalEdges(layouted.edges);
+            
+            setNodes(layouted.nodes);
+            setEdges(layouted.edges);
+            setProjectId(null);
+            
+            setIsAnalyzing(false);
+            setGithubStatus("");
+          } else if (status.status === "error") {
+            alert(`Error: ${status.error}`);
+            setIsAnalyzing(false);
+            setGithubStatus("");
+          }
+        } catch (err) {
+          console.error("Status polling error:", err);
+          setTimeout(pollStatus, 2000); // Continue polling on error
+        }
+      };
+
+      // Start polling
+      setTimeout(pollStatus, 1000);
+
     } catch (err) {
       console.error(err);
-      alert(`Failed to analyze repository: ${err.response?.data?.detail || err.message}`);
+      alert(`Failed to start analysis: ${err.response?.data?.detail || err.message}`);
+      setIsAnalyzing(false);
+      setGithubStatus("");
     }
   };
 
@@ -289,21 +334,41 @@ function App() {
 
       <button
         onClick={analyzeGithub}
+        disabled={isAnalyzing}
         style={{
           position: "absolute",
           top: 60,
           left: 470,
           zIndex: 10,
           padding: "8px 14px",
-          background: "#16a34a",
+          background: isAnalyzing ? "#9ca3af" : "#16a34a",
           color: "white",
           border: "none",
           borderRadius: "6px",
-          cursor: "pointer"
+          cursor: isAnalyzing ? "not-allowed" : "pointer"
         }}
       >
-        Analyze Repo
+        {isAnalyzing ? "Analyzing..." : "Analyze Repo"}
       </button>
+
+      {githubStatus && (
+        <div
+          style={{
+            position: "absolute",
+            top: 100,
+            left: 200,
+            zIndex: 10,
+            padding: "8px 12px",
+            background: "#fef3c7",
+            border: "1px solid #f59e0b",
+            borderRadius: "6px",
+            fontSize: "14px",
+            maxWidth: "400px"
+          }}
+        >
+          {githubStatus}
+        </div>
+      )}
 
       {selectedFile && (
         <div
