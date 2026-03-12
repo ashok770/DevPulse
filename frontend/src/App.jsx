@@ -1,15 +1,19 @@
 import { useState, useCallback } from "react";
-import UploadZone from "./UploadZone";
 import axios from "axios";
-import ReactFlow, {
-  Controls,
+import ReactFlow, { 
+  Controls, 
   Background,
   useNodesState,
   useEdgesState,
-  addEdge,
+  addEdge
 } from "reactflow";
 import dagre from "dagre";
 import "reactflow/dist/style.css";
+import Header from "./components/Header";
+import Sidebar from "./components/Sidebar";
+import GraphView from "./components/GraphView";
+import UploadZone from "./UploadZone";
+import "./App.css";
 
 function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -25,6 +29,7 @@ function App() {
   const [repoUrl, setRepoUrl] = useState("");
   const [githubStatus, setGithubStatus] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [impactData, setImpactData] = useState(null);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -34,15 +39,16 @@ function App() {
   const handleNodeClick = useCallback(async (event, node) => {
     console.log("Node clicked:", node);
     setSelectedFile(node.id);
-
+    
     try {
       const impactPath = projectId ? `uploads/${projectId}` : currentProjectPath;
       const res = await axios.post("http://127.0.0.1:8000/impact", {
         file: node.id,
         project_path: impactPath,
       });
-
+      
       setAffectedFiles(res.data.affected_files);
+      setImpactData(res.data);
     } catch (err) {
       console.error(err);
     }
@@ -90,26 +96,27 @@ function App() {
             
             // Process the results
             const graph = status.graph;
-            const nodes = [];
-            const edges = [];
+            const newNodes = [];
+            const newEdges = [];
 
-            Object.keys(graph).forEach((file, index) => {
-              nodes.push({
+            Object.keys(graph).forEach((file) => {
+              newNodes.push({
                 id: file,
                 data: { label: file },
-                position: { x: index * 200, y: 100 }
+                position: { x: 0, y: 0 }
               });
 
               graph[file].forEach(target => {
-                edges.push({
+                newEdges.push({
                   id: file + "-" + target,
                   source: file,
-                  target: target
+                  target: target,
+                  animated: true
                 });
               });
             });
 
-            const layouted = getLayoutedElements(nodes, edges);
+            const layouted = getLayoutedElements(newNodes, newEdges);
 
             setOriginalNodes(layouted.nodes);
             setOriginalEdges(layouted.edges);
@@ -275,178 +282,94 @@ function App() {
     }
   };
 
+  const onNodeClick = (event, node) => {
+    handleNodeClick(event, node);
+    highlightDependencies(node.id);
+  };
+
+  const onFileUpload = async (acceptedFiles) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await axios.post("http://127.0.0.1:8000/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const graph = res.data.graph;
+      const projectId = res.data.project_id;
+
+      // Set the project ID for impact analysis
+      setProjectId(projectId);
+
+      const newNodes = [];
+      const newEdges = [];
+
+      Object.keys(graph).forEach((file) => {
+        newNodes.push({
+          id: file,
+          data: { label: file },
+          position: { x: 0, y: 0 },
+        });
+
+        graph[file].forEach((target) => {
+          newEdges.push({
+            id: file + "-" + target,
+            source: file,
+            target: target,
+            animated: true,
+          });
+        });
+      });
+
+      const layouted = getLayoutedElements(newNodes, newEdges);
+
+      setOriginalNodes(layouted.nodes);
+      setOriginalEdges(layouted.edges);
+      
+      setNodes(layouted.nodes);
+      setEdges(layouted.edges);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to upload and analyze file");
+    }
+  };
+
   return (
-    <div style={{ height: "100vh", width: "100vw" }}>
-      <button
-        onClick={scanProject}
-        style={{
-          position: "absolute",
-          zIndex: 10,
-          top: 20,
-          left: 20,
-          padding: "10px 20px",
-          background: "#2563eb",
-          color: "white",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer",
-        }}
-      >
-        Scan Codebase
-      </button>
-
-      <input
-        type="text"
-        placeholder="Search file..."
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          filterGraph(e.target.value);
-        }}
-        style={{
-          position: "absolute",
-          top: 20,
-          left: 200,
-          zIndex: 10,
-          padding: "8px",
-          width: "200px",
-          borderRadius: "6px",
-          border: "1px solid #ccc"
-        }}
+    <div className="app">
+      <Header
+        repoUrl={repoUrl}
+        setRepoUrl={setRepoUrl}
+        analyzeGithub={analyzeGithub}
+        search={search}
+        setSearch={setSearch}
+        filterGraph={filterGraph}
+        scanProject={scanProject}
+        isAnalyzing={isAnalyzing}
+        githubStatus={githubStatus}
       />
 
-      <input
-        type="text"
-        placeholder="Paste GitHub repo URL"
-        value={repoUrl}
-        onChange={(e) => setRepoUrl(e.target.value)}
-        style={{
-          position: "absolute",
-          top: 60,
-          left: 200,
-          zIndex: 10,
-          padding: "8px",
-          width: "260px",
-          borderRadius: "6px",
-          border: "1px solid #ccc"
-        }}
-      />
+      <div className="main">
+        <Sidebar 
+          impactData={impactData}
+          selectedFile={selectedFile}
+          affectedFiles={affectedFiles}
+          setSelectedFile={setSelectedFile}
+          onFileUpload={onFileUpload}
+        />
 
-      <button
-        onClick={analyzeGithub}
-        disabled={isAnalyzing}
-        style={{
-          position: "absolute",
-          top: 60,
-          left: 470,
-          zIndex: 10,
-          padding: "8px 14px",
-          background: isAnalyzing ? "#9ca3af" : "#16a34a",
-          color: "white",
-          border: "none",
-          borderRadius: "6px",
-          cursor: isAnalyzing ? "not-allowed" : "pointer"
-        }}
-      >
-        {isAnalyzing ? "Analyzing..." : "Analyze Repo"}
-      </button>
-
-      {githubStatus && (
-        <div
-          style={{
-            position: "absolute",
-            top: 100,
-            left: 200,
-            zIndex: 10,
-            padding: "8px 12px",
-            background: "#fef3c7",
-            border: "1px solid #f59e0b",
-            borderRadius: "6px",
-            fontSize: "14px",
-            maxWidth: "400px"
-          }}
-        >
-          {githubStatus}
-        </div>
-      )}
-
-      {selectedFile && (
-        <div
-          style={{
-            position: "absolute",
-            zIndex: 10,
-            top: 20,
-            right: 20,
-            padding: "15px",
-            background: "white",
-            border: "1px solid #ccc",
-            borderRadius: "8px",
-            maxWidth: "300px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-          }}
-        >
-          <h3 style={{ margin: "0 0 10px 0", fontSize: "16px" }}>
-            Impact Analysis
-          </h3>
-          <p style={{ margin: "0 0 10px 0", fontSize: "14px" }}>
-            <strong>Changed File:</strong> {selectedFile}
-          </p>
-          <p style={{ margin: "0 0 5px 0", fontSize: "14px" }}>
-            <strong>Affected Files:</strong>
-          </p>
-          {affectedFiles.length > 0 ? (
-            <ul style={{ margin: 0, paddingLeft: "20px" }}>
-              {affectedFiles.map((file, index) => (
-                <li key={index} style={{ fontSize: "13px" }}>
-                  {file}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p style={{ fontSize: "13px", color: "#666" }}>No files affected</p>
-          )}
-          <button
-            onClick={() => setSelectedFile("")}
-            style={{
-              marginTop: "10px",
-              padding: "5px 10px",
-              background: "#f0f0f0",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "12px",
-            }}
-          >
-            Close
-          </button>
-        </div>
-      )}
-
-      <div style={{ height: "100%", width: "100%" }}>
-        <ReactFlow
+        <GraphView
           nodes={nodes}
           edges={edges}
+          onNodeClick={onNodeClick}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
-          onNodeClick={(event, node) => {
-            handleNodeClick(event, node);
-            highlightDependencies(node.id);
-          }}
-          fitView
-        >
-          <Controls />
-          <Background />
-        </ReactFlow>
+        />
       </div>
-      <UploadZone
-        setNodes={setNodes}
-        setEdges={setEdges}
-        getLayoutedElements={getLayoutedElements}
-        setProjectId={setProjectId}
-        setOriginalNodes={setOriginalNodes}
-        setOriginalEdges={setOriginalEdges}
-      />
     </div>
   );
 }
