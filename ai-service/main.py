@@ -4,10 +4,13 @@ import uuid
 import shutil
 import time
 import threading
+import subprocess
+import tempfile
 from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
 from scanner import scan_project, impact_analysis 
 from fastapi.middleware.cors import CORSMiddleware
+from git import Repo    
 
 app = FastAPI()
 
@@ -61,6 +64,9 @@ class ImpactRequest(BaseModel):
     file: str
     project_path: str
 
+class GitHubRequest(BaseModel):
+    repo_url: str
+
 @app.post("/scan")
 def scan(req: ScanRequest):
     result = scan_project(req.project_path)
@@ -105,4 +111,67 @@ async def upload_zip(file: UploadFile = File(...)):
         "project_id": upload_id,
         "graph": result["graph"],
         "files": result["files"]
-    }    
+    }
+
+@app.post("/github")
+def analyze_github(req: GitHubRequest):
+    temp_dir = None
+    try:
+        print(f"Starting GitHub analysis for: {req.repo_url}")
+        
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp()
+        print(f"Created temp directory: {temp_dir}")
+        
+        # Clone the repository with increased timeout
+        print("Starting git clone...")
+        result = subprocess.run(
+            ["git", "clone", "--depth", "1", req.repo_url, temp_dir],
+            capture_output=True,
+            text=True,
+            timeout=300  # Increased to 5 minutes
+        )
+        
+        if result.returncode != 0:
+            print(f"Git clone failed: {result.stderr}")
+            return {"error": f"Failed to clone repository: {result.stderr}"}
+        
+        print("Git clone successful, starting scan...")
+        # Scan the cloned repository
+        scan_result = scan_project(temp_dir)
+        print(f"Scan completed. Found {len(scan_result['files'])} files")
+        
+        return {
+            "graph": scan_result["graph"],
+            "files": scan_result["files"],
+            "dependencies": scan_result["dependencies"]
+        }
+        
+    except subprocess.TimeoutExpired:
+        print("Repository cloning timed out after 5 minutes")
+        return {"error": "Repository cloning timed out (5 minutes limit)"}
+    except Exception as e:
+        print(f"Error during GitHub analysis: {str(e)}")
+        return {"error": f"Error analyzing repository: {str(e)}"}
+    finally:
+        # Clean up temporary directory
+        if temp_dir and os.path.exists(temp_dir):
+            print(f"Cleaning up temp directory: {temp_dir}")
+            shutil.rmtree(temp_dir)
+
+
+@app.post("/github")
+def analyze_github(repo_url: str):
+
+    project_id = str(uuid.uuid4())
+
+    clone_path = f"uploads/{project_id}"
+
+    Repo.clone_from(repo_url, clone_path)
+
+    result = scan_project(clone_path)
+
+    return {
+        "project_id": project_id,
+        "graph": result["graph"]
+    }

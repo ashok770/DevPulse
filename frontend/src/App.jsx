@@ -22,6 +22,7 @@ function App() {
   const [originalNodes, setOriginalNodes] = useState([]);
   const [originalEdges, setOriginalEdges] = useState([]);
   const [highlighted, setHighlighted] = useState([]);
+  const [repoUrl, setRepoUrl] = useState("");
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -44,6 +45,57 @@ function App() {
       console.error(err);
     }
   }, [currentProjectPath, projectId]);
+
+  const analyzeGithub = async () => {
+    if (!repoUrl.trim()) {
+      alert("Please enter a GitHub repository URL");
+      return;
+    }
+
+    try {
+      const res = await axios.post("http://127.0.0.1:8000/github", {
+        repo_url: repoUrl
+      });
+
+      if (res.data.error) {
+        alert(`Error: ${res.data.error}`);
+        return;
+      }
+
+      const graph = res.data.graph;
+
+      const nodes = [];
+      const edges = [];
+
+      Object.keys(graph).forEach((file, index) => {
+        nodes.push({
+          id: file,
+          data: { label: file },
+          position: { x: index * 200, y: 100 }
+        });
+
+        graph[file].forEach(target => {
+          edges.push({
+            id: file + "-" + target,
+            source: file,
+            target: target
+          });
+        });
+      });
+
+      const layouted = getLayoutedElements(nodes, edges);
+
+      setOriginalNodes(layouted.nodes);
+      setOriginalEdges(layouted.edges);
+      
+      setNodes(layouted.nodes);
+      setEdges(layouted.edges);
+      setProjectId(null); // Reset for GitHub scan
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to analyze repository: ${err.response?.data?.detail || err.message}`);
+    }
+  };
 
   const highlightDependencies = (file) => {
     const related = new Set();
@@ -217,6 +269,41 @@ function App() {
           border: "1px solid #ccc"
         }}
       />
+
+      <input
+        type="text"
+        placeholder="Paste GitHub repo URL"
+        value={repoUrl}
+        onChange={(e) => setRepoUrl(e.target.value)}
+        style={{
+          position: "absolute",
+          top: 60,
+          left: 200,
+          zIndex: 10,
+          padding: "8px",
+          width: "260px",
+          borderRadius: "6px",
+          border: "1px solid #ccc"
+        }}
+      />
+
+      <button
+        onClick={analyzeGithub}
+        style={{
+          position: "absolute",
+          top: 60,
+          left: 470,
+          zIndex: 10,
+          padding: "8px 14px",
+          background: "#16a34a",
+          color: "white",
+          border: "none",
+          borderRadius: "6px",
+          cursor: "pointer"
+        }}
+      >
+        Analyze Repo
+      </button>
 
       {selectedFile && (
         <div
