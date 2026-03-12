@@ -1,11 +1,11 @@
 import { useState, useCallback } from "react";
 import axios from "axios";
-import ReactFlow, { 
-  Controls, 
+import ReactFlow, {
+  Controls,
   Background,
   useNodesState,
   useEdgesState,
-  addEdge
+  addEdge,
 } from "reactflow";
 import dagre from "dagre";
 import "reactflow/dist/style.css";
@@ -20,7 +20,8 @@ function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [affectedFiles, setAffectedFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState("");
-  const [currentProjectPath, setCurrentProjectPath] = useState("../test_project");
+  const [currentProjectPath, setCurrentProjectPath] =
+    useState("../test_project");
   const [projectId, setProjectId] = useState(null);
   const [search, setSearch] = useState("");
   const [originalNodes, setOriginalNodes] = useState([]);
@@ -30,29 +31,35 @@ function App() {
   const [githubStatus, setGithubStatus] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [impactData, setImpactData] = useState(null);
+  const [sidebarWidth, setSidebarWidth] = useState(250);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
     [setEdges],
   );
 
-  const handleNodeClick = useCallback(async (event, node) => {
-    console.log("Node clicked:", node);
-    setSelectedFile(node.id);
-    
-    try {
-      const impactPath = projectId ? `uploads/${projectId}` : currentProjectPath;
-      const res = await axios.post("http://127.0.0.1:8000/impact", {
-        file: node.id,
-        project_path: impactPath,
-      });
-      
-      setAffectedFiles(res.data.affected_files);
-      setImpactData(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  }, [currentProjectPath, projectId]);
+  const handleNodeClick = useCallback(
+    async (event, node) => {
+      console.log("Node clicked:", node);
+      setSelectedFile(node.id);
+
+      try {
+        const impactPath = projectId
+          ? `uploads/${projectId}`
+          : currentProjectPath;
+        const res = await axios.post("http://127.0.0.1:8000/impact", {
+          file: node.id,
+          project_path: impactPath,
+        });
+
+        setAffectedFiles(res.data.affected_files);
+        setImpactData(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    [currentProjectPath, projectId],
+  );
 
   const analyzeGithub = async () => {
     if (!repoUrl.trim()) {
@@ -66,7 +73,7 @@ function App() {
     try {
       // Start the analysis
       const res = await axios.post("http://127.0.0.1:8000/github", {
-        repo_url: repoUrl
+        repo_url: repoUrl,
       });
 
       if (res.data.error) {
@@ -82,9 +89,12 @@ function App() {
       // Poll for status updates
       const pollStatus = async () => {
         try {
-          const statusRes = await axios.post("http://127.0.0.1:8000/github/status", {
-            job_id: jobId
-          });
+          const statusRes = await axios.post(
+            "http://127.0.0.1:8000/github/status",
+            {
+              job_id: jobId,
+            },
+          );
 
           const status = statusRes.data;
 
@@ -93,7 +103,7 @@ function App() {
             setTimeout(pollStatus, 2000); // Poll every 2 seconds
           } else if (status.status === "completed") {
             setGithubStatus("Analysis completed!");
-            
+
             // Process the results
             const graph = status.graph;
             const newNodes = [];
@@ -103,15 +113,15 @@ function App() {
               newNodes.push({
                 id: file,
                 data: { label: file },
-                position: { x: 0, y: 0 }
+                position: { x: 0, y: 0 },
               });
 
-              graph[file].forEach(target => {
+              graph[file].forEach((target) => {
                 newEdges.push({
                   id: file + "-" + target,
                   source: file,
                   target: target,
-                  animated: true
+                  animated: true,
                 });
               });
             });
@@ -120,11 +130,11 @@ function App() {
 
             setOriginalNodes(layouted.nodes);
             setOriginalEdges(layouted.edges);
-            
+
             setNodes(layouted.nodes);
             setEdges(layouted.edges);
             setProjectId(null);
-            
+
             setIsAnalyzing(false);
             setGithubStatus("");
           } else if (status.status === "error") {
@@ -140,10 +150,11 @@ function App() {
 
       // Start polling
       setTimeout(pollStatus, 1000);
-
     } catch (err) {
       console.error(err);
-      alert(`Failed to start analysis: ${err.response?.data?.detail || err.message}`);
+      alert(
+        `Failed to start analysis: ${err.response?.data?.detail || err.message}`,
+      );
       setIsAnalyzing(false);
       setGithubStatus("");
     }
@@ -153,26 +164,26 @@ function App() {
     const related = new Set();
     related.add(file);
 
-    originalEdges.forEach(edge => {
+    originalEdges.forEach((edge) => {
       if (edge.source === file || edge.target === file) {
         related.add(edge.source);
         related.add(edge.target);
       }
     });
 
-    const newNodes = originalNodes.map(node => ({
+    const newNodes = originalNodes.map((node) => ({
       ...node,
       style: {
-        opacity: related.has(node.id) ? 1 : 0.2
-      }
+        opacity: related.has(node.id) ? 1 : 0.2,
+      },
     }));
 
-    const newEdges = originalEdges.map(edge => ({
+    const newEdges = originalEdges.map((edge) => ({
       ...edge,
       animated: related.has(edge.source) && related.has(edge.target),
       style: {
-        opacity: related.has(edge.source) && related.has(edge.target) ? 1 : 0.1
-      }
+        opacity: related.has(edge.source) && related.has(edge.target) ? 1 : 0.1,
+      },
     }));
 
     setNodes(newNodes);
@@ -188,23 +199,23 @@ function App() {
 
     const lower = query.toLowerCase();
 
-    const matchedNodes = originalNodes.filter(node =>
-      node.id.toLowerCase().includes(lower)
+    const matchedNodes = originalNodes.filter((node) =>
+      node.id.toLowerCase().includes(lower),
     );
 
-    const matchedIds = new Set(matchedNodes.map(n => n.id));
+    const matchedIds = new Set(matchedNodes.map((n) => n.id));
 
-    const connectedEdges = originalEdges.filter(edge =>
-      matchedIds.has(edge.source) || matchedIds.has(edge.target)
+    const connectedEdges = originalEdges.filter(
+      (edge) => matchedIds.has(edge.source) || matchedIds.has(edge.target),
     );
 
-    connectedEdges.forEach(edge => {
+    connectedEdges.forEach((edge) => {
       matchedIds.add(edge.source);
       matchedIds.add(edge.target);
     });
 
-    const filteredNodes = originalNodes.filter(node =>
-      matchedIds.has(node.id)
+    const filteredNodes = originalNodes.filter((node) =>
+      matchedIds.has(node.id),
     );
 
     setNodes(filteredNodes);
@@ -273,7 +284,7 @@ function App() {
 
       setOriginalNodes(layoutedNodes);
       setOriginalEdges(layoutedEdges);
-      
+
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
       setProjectId(null); // Reset for local scan
@@ -329,7 +340,7 @@ function App() {
 
       setOriginalNodes(layouted.nodes);
       setOriginalEdges(layouted.edges);
-      
+
       setNodes(layouted.nodes);
       setEdges(layouted.edges);
     } catch (err) {
@@ -353,12 +364,14 @@ function App() {
       />
 
       <div className="main">
-        <Sidebar 
+        <Sidebar
           impactData={impactData}
           selectedFile={selectedFile}
           affectedFiles={affectedFiles}
           setSelectedFile={setSelectedFile}
           onFileUpload={onFileUpload}
+          width={sidebarWidth}
+          setWidth={setSidebarWidth}
         />
 
         <GraphView

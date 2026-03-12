@@ -36,10 +36,10 @@ export default function Header({
           disabled={isAnalyzing}
         />
 
-        <button 
+        <button
           onClick={analyzeGithub}
           disabled={isAnalyzing}
-          className={isAnalyzing ? "analyzing" : ""}
+          className={`analyze-btn ${isAnalyzing ? "analyzing" : ""}`}
         >
           {isAnalyzing ? "Analyzing..." : "Analyze Repo"}
         </button>
